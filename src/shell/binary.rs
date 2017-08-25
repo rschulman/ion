@@ -58,9 +58,11 @@ impl<'a> Binary for Shell<'a> {
                         Some(user_prompt) => {
                             if let Ok(stdout_capture) = sys::dup(sys::STDOUT_FILENO) {
                                 redir(sys::STDOUT_FILENO, stdout_capture);
-                                let result = user_prompt.execute(self, &[""]);
-                                match result {
-                                    Ok(()) => {
+                                match unsafe { sys::fork() } {
+                                    Ok(0) => { // We are the child, so run the user_prompt
+                                        let _ = user_prompt.execute(self, &[""]);
+                                    }
+                                    Ok(child_pid) => { // We are the parent, so capture the output
                                         let mut capture:File = unsafe { File::from_raw_fd(stdout_capture) };
                                         capture.read_to_string(&mut rprompt);
                                         redir(stdout_capture, sys::STDOUT_FILENO);
